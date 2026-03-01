@@ -1,6 +1,6 @@
-#include "gpu/renderer.hpp"
+#include "aelkyn.hpp"
 
 int main() {
-  Renderer renderer;
-  renderer.run();
+  Aelkyn application;
+  application.init();
 }

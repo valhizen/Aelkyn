@@ -1,11 +1,15 @@
+#include "commands.hpp"
 #include "context.hpp"
-#include "window.hpp"
+#include "frames.hpp"
+#include "pipeline.hpp"
 
 class Renderer {
 public:
-  void run();
+  void init(Window &window);
 
 private:
-  Window window;
   Context context;
+  GraphicsPipeline graphicsPipeline;
+  Commands commands;
+  Frames frames;
 };

@@ -1,7 +1,8 @@
 #include "window.hpp"
 #include <GLFW/glfw3.h>
 
-void Window::init() {
+Window::Window() {
+
   glfwInit();
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -9,3 +10,10 @@ void Window::init() {
 
   window = glfwCreateWindow(800, 900, "Aelkyn", nullptr, nullptr);
 }
+
+Window::~Window() {
+  glfwDestroyWindow(window);
+  glfwTerminate();
+}
+bool Window::shouldClose() { return glfwWindowShouldClose(window); }
+void Window::pollEvents() { glfwPollEvents(); }
