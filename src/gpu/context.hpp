@@ -12,7 +12,9 @@ class Context {
 public:
   void init(Window &window);
   void drawFrame();
-  bool enableValidationLayer = true;
+  void recreateSwapChain();
+  void cleanupSwapChain();
+  // bool enableValidationLayer = true;
   // Helper Functions
   const vk::raii::Device &getLogicalDevice() const { return logicalDevice; }
   const vk::SurfaceFormatKHR &getSurfaceFormat() const {

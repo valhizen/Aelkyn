@@ -1,5 +1,6 @@
 #include "commands.hpp"
 #include "pipeline.hpp"
+#include <cstdint>
 
 void Commands::init(Context &device, GraphicsPipeline &graphicsPipeline) {
 
@@ -18,22 +19,28 @@ void Commands::createCommandPool() {
 }
 
 void Commands::createCommandBuffer() {
-  vk::CommandBufferAllocateInfo allocInfo{.commandPool = commandPool,
-                                          .level =
-                                              vk::CommandBufferLevel::ePrimary,
-                                          .commandBufferCount = 1};
+  vk::CommandBufferAllocateInfo allocInfo{
+      .commandPool = commandPool,
+      .level = vk::CommandBufferLevel::ePrimary,
+      .commandBufferCount = CMD_MAX_FLIGHT_FRAMES};
 
-  commandBuffer = std::move(
-      vk::raii::CommandBuffers(device->getLogicalDevice(), allocInfo).front());
+  // commandBuffer =
+  //     vk::raii::CommandBuffers(device->getLogicalDevice(), allocInfo);
+
+  auto buffers =
+      vk::raii::CommandBuffers(device->getLogicalDevice(), allocInfo);
+  for (auto &buf : buffers) {
+    commandBuffer.push_back(std::move(buf));
+  }
 }
 
-void Commands::recordCommandBuffer(uint32_t imageIndex) {
+void Commands::recordCommandBuffer(uint32_t imageIndex, uint32_t frameIndex) {
 
-  commandBuffer.begin({});
+  commandBuffer[frameIndex].begin({});
   // Before starting rendering, transition the swapchain image to
   // COLOR_ATTACHMENT_OPTIMAL
   transition_image_layout(
-      imageIndex, vk::ImageLayout::eUndefined,
+      imageIndex, frameIndex, vk::ImageLayout::eUndefined,
       vk::ImageLayout::eColorAttachmentOptimal,
       {}, // srcAccessMask (no need to wait for previous operations)
       vk::AccessFlagBits2::eColorAttachmentWrite,         // dstAccessMask
@@ -53,31 +60,32 @@ void Commands::recordCommandBuffer(uint32_t imageIndex) {
       .colorAttachmentCount = 1,
       .pColorAttachments = &attachmentInfo};
 
-  commandBuffer.beginRendering(renderingInfo);
-  commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                             *graphicsPipeline->getGraphicsPipeline());
-  commandBuffer.setViewport(
+  commandBuffer[frameIndex].beginRendering(renderingInfo);
+  commandBuffer[frameIndex].bindPipeline(
+      vk::PipelineBindPoint::eGraphics,
+      *graphicsPipeline->getGraphicsPipeline());
+  commandBuffer[frameIndex].setViewport(
       0, vk::Viewport(0.0f, 0.0f,
                       static_cast<float>(device->getSwapChainExtent().width),
                       static_cast<float>(device->getSwapChainExtent().height),
                       0.0f, 1.0f));
-  commandBuffer.setScissor(
+  commandBuffer[frameIndex].setScissor(
       0, vk::Rect2D(vk::Offset2D(0, 0), device->getSwapChainExtent()));
-  commandBuffer.draw(3, 1, 0, 0);
-  commandBuffer.endRendering();
+  commandBuffer[frameIndex].draw(3, 1, 0, 0);
+  commandBuffer[frameIndex].endRendering();
   // After rendering, transition the swapchain image to PRESENT_SRC
   transition_image_layout(
-      imageIndex, vk::ImageLayout::eColorAttachmentOptimal,
+      imageIndex, frameIndex, vk::ImageLayout::eColorAttachmentOptimal,
       vk::ImageLayout::ePresentSrcKHR,
       vk::AccessFlagBits2::eColorAttachmentWrite,         // srcAccessMask
       {},                                                 // dstAccessMask
       vk::PipelineStageFlagBits2::eColorAttachmentOutput, // srcStage
       vk::PipelineStageFlagBits2::eBottomOfPipe           // dstStage
   );
-  commandBuffer.end();
+  commandBuffer[frameIndex].end();
 }
 
-void Commands::transition_image_layout(uint32_t imageIndex,
+void Commands::transition_image_layout(uint32_t imageIndex, uint32_t frameIndex,
                                        vk::ImageLayout oldLayout,
                                        vk::ImageLayout newLayout,
                                        vk::AccessFlags2 srcAccessMask,
@@ -102,5 +110,5 @@ void Commands::transition_image_layout(uint32_t imageIndex,
   vk::DependencyInfo dependencyInfo = {.dependencyFlags = {},
                                        .imageMemoryBarrierCount = 1,
                                        .pImageMemoryBarriers = &barrier};
-  commandBuffer.pipelineBarrier2(dependencyInfo);
+  commandBuffer[frameIndex].pipelineBarrier2(dependencyInfo);
 }

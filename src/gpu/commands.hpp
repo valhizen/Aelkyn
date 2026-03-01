@@ -1,9 +1,13 @@
 #pragma once
 
 #include "pipeline.hpp"
+#include <cstdint>
+#include <vector>
 
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
+
+constexpr int CMD_MAX_FLIGHT_FRAMES = 2;
 
 class Commands {
 
@@ -12,7 +16,8 @@ private:
   void createCommandBuffer();
   void createSyncObjects();
 
-  void transition_image_layout(uint32_t imageIndex, vk::ImageLayout oldLayout,
+  void transition_image_layout(uint32_t imageIndex, uint32_t frameIndex,
+                               vk::ImageLayout oldLayout,
                                vk::ImageLayout newLayout,
                                vk::AccessFlags2 srcAccessMask,
                                vk::AccessFlags2 dstAccessMask,
@@ -22,13 +27,13 @@ private:
   Context *device;
   GraphicsPipeline *graphicsPipeline;
   vk::raii::CommandPool commandPool = nullptr;
-  vk::raii::CommandBuffer commandBuffer = nullptr;
+  std::vector<vk::raii::CommandBuffer> commandBuffer;
 
 public:
   void init(Context &context, GraphicsPipeline &graphicsPipeline);
 
-  void recordCommandBuffer(uint32_t imageIndex);
-  const vk::raii::CommandBuffer &getCommandBuffer() const {
-    return commandBuffer;
+  void recordCommandBuffer(uint32_t imageIndex, uint32_t frameIndex);
+  const vk::raii::CommandBuffer &getCommandBuffer(uint32_t frameIndex) const {
+    return commandBuffer[frameIndex];
   }
 };

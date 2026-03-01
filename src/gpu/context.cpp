@@ -24,7 +24,7 @@ void Context::createInstance() {
       .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
       .pEngineName = "No Engie",
       .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-      .apiVersion = vk::ApiVersion14,
+      .apiVersion = vk::ApiVersion13,
   };
   auto requiredExtensions = getRequiredInstanceExtensions();
   vk::InstanceCreateInfo createInfo = {
@@ -39,9 +39,9 @@ std::vector<const char *> Context::getRequiredInstanceExtensions() {
   auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
   std::vector extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-  if (enableValidationLayer) {
-    extensions.push_back(vk::EXTDebugUtilsExtensionName);
-  }
+  // if (enableValidationLayer) {
+  //   extensions.push_back(vk::EXTDebugUtilsExtensionName);
+  // }
   return extensions;
 }
 
@@ -91,7 +91,8 @@ void Context::createLogicalDevice() {
       featureChain = {
           {}, // vk::PhysicalDeviceFeatures2
           {.shaderDrawParameters = true},
-          {.dynamicRendering = true}, // vk::PhysicalDeviceVulkan13Features
+          // {.dynamicRendering = true}, // vk::PhysicalDeviceVulkan13Features
+          {.synchronization2 = true, .dynamicRendering = true},
           {.extendedDynamicState =
                true} // vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
       };
@@ -261,4 +262,26 @@ void Context::createImageViews() {
     imageViewCreateInfo.image = image;
     swapChainImageViews.emplace_back(logicalDevice, imageViewCreateInfo);
   }
+}
+
+void Context::recreateSwapChain() {
+
+  int width = 0, height = 0;
+  glfwGetFramebufferSize(window->getWindow(), &width, &height);
+  while (width == 0 || height == 0) {
+    glfwGetFramebufferSize(window->getWindow(), &width, &height);
+    glfwWaitEvents();
+  }
+
+  logicalDevice.waitIdle();
+
+  cleanupSwapChain();
+
+  createSwapChain();
+  createImageViews();
+}
+
+void Context::cleanupSwapChain() {
+  swapChainImageViews.clear();
+  swapChain = nullptr;
 }

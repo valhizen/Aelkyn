@@ -6,13 +6,10 @@
 class Renderer {
 public:
   void init(Window &window);
-
   void drawFrame();
-  void waitIdle();
 
 private:
   Context context;
   GraphicsPipeline graphicsPipeline;
   Commands commands;
   Frames frames;
-};

@@ -6,6 +6,9 @@ void Renderer::init(Window &window) {
   context.init(window);
   graphicsPipeline.init(context);
   commands.init(context, graphicsPipeline);
-  frames.init(context, commands);
-  frames.drawFrame();
+  frames.init(context, commands, window);
 }
+
+void Renderer::drawFrame() { frames.drawFrame(); }
+
+void Renderer::waitIdle() { context.getLogicalDevice().waitIdle(); }

@@ -2,21 +2,32 @@
 
 #include "commands.hpp"
 #include "context.hpp"
+#include <vector>
 #include <vulkan/vulkan_raii.hpp>
+
+constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 class Frames {
 
 private:
-  vk::raii::Semaphore presentCompleteSemaphore = nullptr;
-  vk::raii::Semaphore renderFinishedSemaphore = nullptr;
-  vk::raii::Fence drawFence = nullptr;
+  // std::vector<vk::raii::Semaphore> presentCompleteSemaphore;
+  // std::vector<vk::raii::Semaphore> renderFinishedSemaphore;
+  // std::vector<vk::raii::Fence> drawFence;
 
+  std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
+  std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
+  std::vector<vk::raii::Fence> inFlightFences;
+
+  uint32_t currentFrame = 0;
+  bool framebufferResized = false;
   Context *device;
+
   Commands *commands;
+  Window *window;
 
   void createSyncObjects();
 
 public:
-  void init(Context &device, Commands &commands);
+  void init(Context &device, Commands &commands, Window &window);
   void drawFrame();
 };

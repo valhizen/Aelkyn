@@ -1,67 +1,78 @@
 #include "frames.hpp"
 #include "commands.hpp"
 #include "context.hpp"
-#include <iostream>
 
-void Frames::init(Context &device, Commands &commands) {
+void Frames::init(Context &device, Commands &commands, Window &window) {
   this->device = &device;
   this->commands = &commands;
+  this->window = &window;
   createSyncObjects();
 }
 
 void Frames::createSyncObjects() {
-  presentCompleteSemaphore = vk::raii::Semaphore(device->getLogicalDevice(),
-                                                 vk::SemaphoreCreateInfo());
-  renderFinishedSemaphore = vk::raii::Semaphore(device->getLogicalDevice(),
-                                                vk::SemaphoreCreateInfo());
-  drawFence = vk::raii::Fence(device->getLogicalDevice(),
-                              {.flags = vk::FenceCreateFlagBits::eSignaled});
+  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    presentCompleteSemaphores.emplace_back(device->getLogicalDevice(),
+                                           vk::SemaphoreCreateInfo());
+    renderFinishedSemaphores.emplace_back(device->getLogicalDevice(),
+                                          vk::SemaphoreCreateInfo());
+    inFlightFences.emplace_back(
+        device->getLogicalDevice(),
+        vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
+  }
 }
 
 void Frames::drawFrame() {
 
-  device->getQueue()
-      .waitIdle(); // NOTE: for simplicity, wait for the queue to be idle
-                   // before starting the frame In the next chapter you see how
-                   // to use multiple frames in flight and fences to sync
+  auto fenceResult = device->getLogicalDevice().waitForFences(
+      *inFlightFences[currentFrame], vk::True, UINT64_MAX);
+  if (fenceResult != vk::Result::eSuccess) {
+    throw std::runtime_error("failed to wait for fence!");
+  }
 
-  auto [result, imageIndex] = device->getSwapChain().acquireNextImage(
-      UINT64_MAX, *presentCompleteSemaphore, nullptr);
-  commands->recordCommandBuffer(imageIndex);
+  auto [acquireResult, imageIndex] = device->getSwapChain().acquireNextImage(
+      UINT64_MAX, *presentCompleteSemaphores[currentFrame], nullptr);
 
-  device->getLogicalDevice().resetFences(*drawFence);
+  if (acquireResult == vk::Result::eErrorOutOfDateKHR) {
+    device->recreateSwapChain();
+    return;
+  }
+  if (acquireResult != vk::Result::eSuccess &&
+      acquireResult != vk::Result::eSuboptimalKHR) {
+    throw std::runtime_error("failed to acquire swap chain image!");
+  }
+
+  // Only reset fence after we know we're submitting work
+  device->getLogicalDevice().resetFences(*inFlightFences[currentFrame]);
+
+  commands->recordCommandBuffer(imageIndex, currentFrame);
+
   vk::PipelineStageFlags waitDestinationStageMask(
       vk::PipelineStageFlagBits::eColorAttachmentOutput);
   const vk::SubmitInfo submitInfo{
       .waitSemaphoreCount = 1,
-      .pWaitSemaphores = &*presentCompleteSemaphore,
+      .pWaitSemaphores = &*presentCompleteSemaphores[currentFrame],
       .pWaitDstStageMask = &waitDestinationStageMask,
       .commandBufferCount = 1,
-      .pCommandBuffers = &*commands->getCommandBuffer(),
+      .pCommandBuffers = &*commands->getCommandBuffer(currentFrame),
       .signalSemaphoreCount = 1,
-      .pSignalSemaphores = &*renderFinishedSemaphore};
-  device->getQueue().submit(submitInfo, *drawFence);
-  result = device->getLogicalDevice().waitForFences(*drawFence, vk::True,
-                                                    UINT64_MAX);
-  if (result != vk::Result::eSuccess) {
-    throw std::runtime_error("failed to wait for fence!");
-  }
+      .pSignalSemaphores = &*renderFinishedSemaphores[currentFrame]};
+  device->getQueue().submit(submitInfo, *inFlightFences[currentFrame]);
 
   const vk::PresentInfoKHR presentInfoKHR{
       .waitSemaphoreCount = 1,
-      .pWaitSemaphores = &*renderFinishedSemaphore,
+      .pWaitSemaphores = &*renderFinishedSemaphores[currentFrame],
       .swapchainCount = 1,
       .pSwapchains = &*device->getSwapChain(),
       .pImageIndices = &imageIndex};
-  result = device->getQueue().presentKHR(presentInfoKHR);
-  switch (result) {
-  case vk::Result::eSuccess:
-    break;
-  case vk::Result::eSuboptimalKHR:
-    std::cout
-        << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n";
-    break;
-  default:
-    break; // an unexpected result is returned!
+  auto presentResult = device->getQueue().presentKHR(presentInfoKHR);
+
+  if (presentResult == vk::Result::eSuboptimalKHR ||
+      presentResult == vk::Result::eErrorOutOfDateKHR || framebufferResized) {
+    framebufferResized = false;
+    device->recreateSwapChain();
+  } else {
+    assert(presentResult == vk::Result::eSuccess);
   }
+
+  currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
