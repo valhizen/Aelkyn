@@ -1,3 +1,5 @@
+#pragma once
+
 #include "gpu/renderer.hpp"
 
 class Aelkyn {

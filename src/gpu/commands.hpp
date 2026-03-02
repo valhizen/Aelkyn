@@ -1,5 +1,6 @@
 #pragma once
 
+#include "buffer.hpp"
 #include "pipeline.hpp"
 #include <cstdint>
 #include <vector>
@@ -14,7 +15,6 @@ class Commands {
 private:
   void createCommandPool();
   void createCommandBuffer();
-  void createSyncObjects();
 
   void transition_image_layout(uint32_t imageIndex, uint32_t frameIndex,
                                vk::ImageLayout oldLayout,
@@ -26,14 +26,17 @@ private:
 
   Context *device;
   GraphicsPipeline *graphicsPipeline;
+  Buffer *buffer;
   vk::raii::CommandPool commandPool = nullptr;
   std::vector<vk::raii::CommandBuffer> commandBuffer;
 
 public:
-  void init(Context &context, GraphicsPipeline &graphicsPipeline);
+  void init(Context &context, GraphicsPipeline &graphicsPipeline,
+            Buffer &buffer);
 
   void recordCommandBuffer(uint32_t imageIndex, uint32_t frameIndex);
   const vk::raii::CommandBuffer &getCommandBuffer(uint32_t frameIndex) const {
     return commandBuffer[frameIndex];
   }
+  const vk::raii::CommandPool &getCommandPool() const { return commandPool; }
 };

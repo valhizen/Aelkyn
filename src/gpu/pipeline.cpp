@@ -1,5 +1,6 @@
 #include "pipeline.hpp"
 #include "../core/utils.hpp"
+#include "buffer.hpp"
 #include "context.hpp"
 
 void GraphicsPipeline::init(Context &device) {
@@ -23,7 +24,16 @@ void GraphicsPipeline::createGraphicsPipeline() {
   vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo,
                                                       fragShaderStageInfo};
 
-  vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+  auto bindingDescription = Vertex::getBindingDescription();
+  auto attributeDescriptions = Vertex::getAttributeDescriptions();
+  vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
+      .vertexBindingDescriptionCount = 1,
+      .pVertexBindingDescriptions = &bindingDescription,
+      .vertexAttributeDescriptionCount =
+          static_cast<uint32_t>(attributeDescriptions.size()),
+      .pVertexAttributeDescriptions = attributeDescriptions.data()};
+
+  // FIX: These two were missing - declared and used inline
   vk::PipelineInputAssemblyStateCreateInfo inputAssembly{
       .topology = vk::PrimitiveTopology::eTriangleList};
   vk::PipelineViewportStateCreateInfo viewportState{.viewportCount = 1,

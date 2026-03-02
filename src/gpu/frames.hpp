@@ -10,18 +10,12 @@ constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 class Frames {
 
 private:
-  // std::vector<vk::raii::Semaphore> presentCompleteSemaphore;
-  // std::vector<vk::raii::Semaphore> renderFinishedSemaphore;
-  // std::vector<vk::raii::Fence> drawFence;
-
   std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
   std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
   std::vector<vk::raii::Fence> inFlightFences;
 
   uint32_t currentFrame = 0;
-  bool framebufferResized = false;
   Context *device;
-
   Commands *commands;
   Window *window;
 

@@ -1,18 +1,21 @@
 #include "context.hpp"
+#include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
+#include <limits>
 #include <map>
-#include <ostream>
 #include <stdexcept>
-#include <utility>
 #include <vector>
 
 void Context::init(Window &window) {
   this->window = &window;
 
   createInstance();
+  setupDebugMessenger();
   createSurface();
   pickPhysicalDevice();
+  findQueueFamilies();
   createLogicalDevice();
   createSwapChain();
   createImageViews();
@@ -22,26 +25,82 @@ void Context::createInstance() {
   constexpr vk::ApplicationInfo appInfo{
       .pApplicationName = "Aelkyn",
       .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-      .pEngineName = "No Engie",
+      .pEngineName = "No Engine",
       .engineVersion = VK_MAKE_VERSION(1, 0, 0),
       .apiVersion = vk::ApiVersion13,
   };
+
+  // Get required layers
+  std::vector<char const *> requiredLayers;
+  if (enableValidationLayers) {
+    requiredLayers.assign(validationLayers.begin(), validationLayers.end());
+
+    // Check layer support
+    auto layerProperties = context.enumerateInstanceLayerProperties();
+    auto unsupportedLayerIt = std::ranges::find_if(
+        requiredLayers, [&layerProperties](auto const &requiredLayer) {
+          return std::ranges::none_of(
+              layerProperties, [requiredLayer](auto const &layerProperty) {
+                return strcmp(layerProperty.layerName, requiredLayer) == 0;
+              });
+        });
+    if (unsupportedLayerIt != requiredLayers.end()) {
+      throw std::runtime_error("Required layer not supported: " +
+                               std::string(*unsupportedLayerIt));
+    }
+  }
+
   auto requiredExtensions = getRequiredInstanceExtensions();
+
   vk::InstanceCreateInfo createInfo = {
       .pApplicationInfo = &appInfo,
+      .enabledLayerCount = static_cast<uint32_t>(requiredLayers.size()),
+      .ppEnabledLayerNames = requiredLayers.data(),
       .enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size()),
       .ppEnabledExtensionNames = requiredExtensions.data()};
   instance = vk::raii::Instance(context, createInfo);
-};
+}
+
+void Context::setupDebugMessenger() {
+  if (!enableValidationLayers)
+    return;
+
+  vk::DebugUtilsMessageSeverityFlagsEXT severityFlags(
+      vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+      vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+      vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
+  vk::DebugUtilsMessageTypeFlagsEXT messageTypeFlags(
+      vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+      vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
+      vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation);
+  vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfoEXT{
+      .messageSeverity = severityFlags,
+      .messageType = messageTypeFlags,
+      .pfnUserCallback = &debugCallback};
+  debugMessenger =
+      instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
+}
+
+VKAPI_ATTR vk::Bool32 VKAPI_CALL Context::debugCallback(
+    vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+    vk::DebugUtilsMessageTypeFlagsEXT type,
+    const vk::DebugUtilsMessengerCallbackDataEXT *pCallbackData, void *) {
+  if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eError ||
+      severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
+    std::cerr << "validation layer: type " << to_string(type)
+              << " msg: " << pCallbackData->pMessage << std::endl;
+  }
+  return vk::False;
+}
 
 std::vector<const char *> Context::getRequiredInstanceExtensions() {
   uint32_t glfwExtensionCount{0};
   auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
   std::vector extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-  // if (enableValidationLayer) {
-  //   extensions.push_back(vk::EXTDebugUtilsExtensionName);
-  // }
+  if (enableValidationLayers) {
+    extensions.push_back(vk::EXTDebugUtilsExtensionName);
+  }
   return extensions;
 }
 
@@ -49,38 +108,86 @@ void Context::pickPhysicalDevice() {
   auto devices = vk::raii::PhysicalDevices(instance);
 
   if (devices.empty()) {
-    throw std::runtime_error("failed to fing GPU with vulkan Support");
+    throw std::runtime_error("failed to find GPU with Vulkan support");
   }
-  std::multimap<int, vk::raii::PhysicalDevice> canidates;
 
-  // auto props3 = devices[2].getProperties();
-  // std::cout << props3.deviceName;
+  // Score devices, preferring discrete GPUs
+  std::multimap<int, const vk::raii::PhysicalDevice *> candidates;
 
   for (const auto &device : devices) {
-    auto deviceProperties = device.getProperties();
-    auto deviceFeatures = device.getFeatures();
-    uint32_t score = 0;
+    auto props = device.getProperties();
 
-    // Discrete GPUs have a significant performance advantage
-    if (deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
+    // Check minimum requirements
+    if (props.apiVersion < VK_API_VERSION_1_3)
+      continue;
+
+    auto queueFamilies = device.getQueueFamilyProperties();
+    if (!std::ranges::any_of(queueFamilies, [](auto const &qfp) {
+          return !!(qfp.queueFlags & vk::QueueFlagBits::eGraphics);
+        }))
+      continue;
+
+    auto availableDeviceExtensions =
+        device.enumerateDeviceExtensionProperties();
+    if (!std::ranges::all_of(deviceExtensions, [&availableDeviceExtensions](
+                                                   auto const &requiredExt) {
+          return std::ranges::any_of(availableDeviceExtensions,
+                                     [requiredExt](auto const &availableExt) {
+                                       return strcmp(availableExt.extensionName,
+                                                     requiredExt) == 0;
+                                     });
+        }))
+      continue;
+
+    auto features = device.template getFeatures2<
+        vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features,
+        vk::PhysicalDeviceVulkan13Features,
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
+    if (!features.template get<vk::PhysicalDeviceVulkan11Features>()
+             .shaderDrawParameters ||
+        !features.template get<vk::PhysicalDeviceVulkan13Features>()
+             .dynamicRendering ||
+        !features
+             .template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>()
+             .extendedDynamicState)
+      continue;
+
+    // Score: discrete GPUs get a big bonus
+    uint32_t score = 0;
+    if (props.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
       score += 1000;
     }
-    score += deviceProperties.limits.maxImageDimension2D;
+    score += props.limits.maxImageDimension2D;
 
-    // if (!deviceFeatures.geometryShader) {
-    //   continue;
-    // }
-    canidates.insert(std::make_pair(score, device));
+    candidates.insert(std::make_pair(score, &device));
   }
-  // Check if the best candidate is suitable at all
-  if (canidates.rbegin()->first > 0) {
-    physicalDevice = canidates.rbegin()->second;
-  } else {
+
+  if (candidates.empty() || candidates.rbegin()->first == 0) {
     throw std::runtime_error("failed to find a suitable GPU!");
   }
-  // Get The device that we are using
-  auto props2 = physicalDevice.getProperties().deviceName;
-  std::cout << props2 << std::endl;
+
+  physicalDevice = *candidates.rbegin()->second;
+
+  auto props = physicalDevice.getProperties().deviceName;
+  std::cout << "Selected GPU: " << props << std::endl;
+}
+
+void Context::findQueueFamilies() {
+  std::vector<vk::QueueFamilyProperties> queueFamilyProperties =
+      physicalDevice.getQueueFamilyProperties();
+
+  for (uint32_t i = 0; i < queueFamilyProperties.size(); i++) {
+    if ((queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics) &&
+        physicalDevice.getSurfaceSupportKHR(i, *surface)) {
+      graphicsQueueFamilyIndex = i;
+      return;
+    }
+  }
+
+  if (graphicsQueueFamilyIndex == ~0u) {
+    throw std::runtime_error(
+        "Could not find a queue for graphics and present -> terminating");
+  }
 }
 
 void Context::createLogicalDevice() {
@@ -88,14 +195,10 @@ void Context::createLogicalDevice() {
                      vk::PhysicalDeviceVulkan11Features,
                      vk::PhysicalDeviceVulkan13Features,
                      vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>
-      featureChain = {
-          {}, // vk::PhysicalDeviceFeatures2
-          {.shaderDrawParameters = true},
-          // {.dynamicRendering = true}, // vk::PhysicalDeviceVulkan13Features
-          {.synchronization2 = true, .dynamicRendering = true},
-          {.extendedDynamicState =
-               true} // vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
-      };
+      featureChain = {{},
+                      {.shaderDrawParameters = true},
+                      {.synchronization2 = true, .dynamicRendering = true},
+                      {.extendedDynamicState = true}};
 
   float queuePriority = 0.5f;
   vk::DeviceQueueCreateInfo deviceQueueCreateInfo{
@@ -114,64 +217,9 @@ void Context::createLogicalDevice() {
   graphicsQueue = vk::raii::Queue(logicalDevice, graphicsQueueFamilyIndex, 0);
 }
 
-void Context::findQueueFamilies(const vk::raii::SurfaceKHR surface) {
-  // find the index of the first queue family that supports graphics
-  std::vector<vk::QueueFamilyProperties> queueFamilyProperties =
-      physicalDevice.getQueueFamilyProperties();
-
-  // get the first index into queueFamilyProperties which supports graphics
-  auto graphicsQueueFamilyProperty =
-      std::ranges::find_if(queueFamilyProperties, [](auto const &qfp) {
-        return (qfp.queueFlags & vk::QueueFlagBits::eGraphics) !=
-               static_cast<vk::QueueFlags>(0);
-      });
-
-  auto graphicsIndex = static_cast<uint32_t>(std::distance(
-      queueFamilyProperties.begin(), graphicsQueueFamilyProperty));
-
-  // determine a queueFamilyIndex that supports present
-  // first check if the graphicsIndex is good enough
-  auto presentIndex =
-      physicalDevice.getSurfaceSupportKHR(graphicsIndex, *surface)
-          ? graphicsIndex
-          : static_cast<uint32_t>(queueFamilyProperties.size());
-  if (presentIndex == queueFamilyProperties.size()) {
-    // the graphicsIndex doesn't support present -> look for another family
-    // index that supports both graphics and present
-    for (size_t i = 0; i < queueFamilyProperties.size(); i++) {
-      if ((queueFamilyProperties[i].queueFlags &
-           vk::QueueFlagBits::eGraphics) &&
-          physicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i),
-                                              *surface)) {
-        graphicsIndex = static_cast<uint32_t>(i);
-        presentIndex = graphicsIndex;
-        break;
-      }
-    }
-    if (presentIndex == queueFamilyProperties.size()) {
-      // there's nothing like a single family index that supports both graphics
-      // and present -> look for another family index that supports present
-      for (size_t i = 0; i < queueFamilyProperties.size(); i++) {
-        if (physicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i),
-                                                *surface)) {
-          presentIndex = static_cast<uint32_t>(i);
-          break;
-        }
-      }
-    }
-  }
-  if ((graphicsIndex == queueFamilyProperties.size()) ||
-      (presentIndex == queueFamilyProperties.size())) {
-    throw std::runtime_error(
-        "Could not find a queue for graphics or present -> terminating");
-  }
-}
-
 void Context::createSurface() {
-
   VkSurfaceKHR _surface;
   if (glfwCreateWindowSurface(*instance, window->getWindow(), nullptr,
-
                               &_surface) != 0) {
     throw std::runtime_error("failed to create window surface!");
   }
@@ -186,7 +234,6 @@ vk::SurfaceFormatKHR Context::chooseSwapSurfaceFormat(
       return availableFormat;
     }
   }
-
   return availableFormats[0];
 }
 
@@ -226,7 +273,6 @@ uint32_t Context::chooseSwapMinImageCount(
 }
 
 void Context::createSwapChain() {
-
   auto surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
   swapChainExtent = chooseSwapExtent(surfaceCapabilities);
   swapChainSurfaceFormat =
@@ -251,7 +297,6 @@ void Context::createSwapChain() {
 }
 
 void Context::createImageViews() {
-
   assert(swapChainImageViews.empty());
 
   vk::ImageViewCreateInfo imageViewCreateInfo{
@@ -265,7 +310,6 @@ void Context::createImageViews() {
 }
 
 void Context::recreateSwapChain() {
-
   int width = 0, height = 0;
   glfwGetFramebufferSize(window->getWindow(), &width, &height);
   while (width == 0 || height == 0) {
@@ -276,7 +320,6 @@ void Context::recreateSwapChain() {
   logicalDevice.waitIdle();
 
   cleanupSwapChain();
-
   createSwapChain();
   createImageViews();
 }

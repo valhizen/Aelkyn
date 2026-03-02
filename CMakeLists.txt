@@ -17,6 +17,7 @@ add_executable(app
   src/gpu/pipeline.cpp
   src/gpu/commands.cpp
   src/gpu/frames.cpp
+  src/gpu/buffer.cpp
 )
 
 target_include_directories(app

@@ -5,7 +5,8 @@
 void Renderer::init(Window &window) {
   context.init(window);
   graphicsPipeline.init(context);
-  commands.init(context, graphicsPipeline);
+  buffer.init(context);
+  commands.init(context, graphicsPipeline, buffer);
   frames.init(context, commands, window);
 }
 

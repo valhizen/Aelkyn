@@ -10,11 +10,14 @@ void Frames::init(Context &device, Commands &commands, Window &window) {
 }
 
 void Frames::createSyncObjects() {
+  for (size_t i = 0; i < device->getSwapChainImageCount(); i++) {
+    renderFinishedSemaphores.emplace_back(device->getLogicalDevice(),
+                                          vk::SemaphoreCreateInfo());
+  }
+
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     presentCompleteSemaphores.emplace_back(device->getLogicalDevice(),
                                            vk::SemaphoreCreateInfo());
-    renderFinishedSemaphores.emplace_back(device->getLogicalDevice(),
-                                          vk::SemaphoreCreateInfo());
     inFlightFences.emplace_back(
         device->getLogicalDevice(),
         vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
@@ -48,6 +51,7 @@ void Frames::drawFrame() {
 
   vk::PipelineStageFlags waitDestinationStageMask(
       vk::PipelineStageFlagBits::eColorAttachmentOutput);
+
   const vk::SubmitInfo submitInfo{
       .waitSemaphoreCount = 1,
       .pWaitSemaphores = &*presentCompleteSemaphores[currentFrame],
@@ -55,20 +59,20 @@ void Frames::drawFrame() {
       .commandBufferCount = 1,
       .pCommandBuffers = &*commands->getCommandBuffer(currentFrame),
       .signalSemaphoreCount = 1,
-      .pSignalSemaphores = &*renderFinishedSemaphores[currentFrame]};
+      .pSignalSemaphores = &*renderFinishedSemaphores[imageIndex]};
   device->getQueue().submit(submitInfo, *inFlightFences[currentFrame]);
 
   const vk::PresentInfoKHR presentInfoKHR{
       .waitSemaphoreCount = 1,
-      .pWaitSemaphores = &*renderFinishedSemaphores[currentFrame],
+      .pWaitSemaphores = &*renderFinishedSemaphores[imageIndex],
       .swapchainCount = 1,
       .pSwapchains = &*device->getSwapChain(),
       .pImageIndices = &imageIndex};
   auto presentResult = device->getQueue().presentKHR(presentInfoKHR);
 
   if (presentResult == vk::Result::eSuboptimalKHR ||
-      presentResult == vk::Result::eErrorOutOfDateKHR || framebufferResized) {
-    framebufferResized = false;
+      presentResult == vk::Result::eErrorOutOfDateKHR || window->wasResized()) {
+    window->resetResizedFlag();
     device->recreateSwapChain();
   } else {
     assert(presentResult == vk::Result::eSuccess);

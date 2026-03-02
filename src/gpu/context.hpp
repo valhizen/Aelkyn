@@ -2,7 +2,6 @@
 
 #include "../window.hpp"
 #include <cstdint>
-#include <sys/types.h>
 #include <vector>
 
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
@@ -11,11 +10,9 @@
 class Context {
 public:
   void init(Window &window);
-  void drawFrame();
   void recreateSwapChain();
   void cleanupSwapChain();
-  // bool enableValidationLayer = true;
-  // Helper Functions
+
   const vk::raii::Device &getLogicalDevice() const { return logicalDevice; }
   const vk::SurfaceFormatKHR &getSurfaceFormat() const {
     return swapChainSurfaceFormat;
@@ -36,29 +33,37 @@ public:
   }
 
   const vk::Extent2D &getSwapChainExtent() const { return swapChainExtent; }
+  const vk::raii::PhysicalDevice &getPhysicalDevice() const {
+    return physicalDevice;
+  }
+
+  uint32_t getSwapChainImageCount() const {
+    return static_cast<uint32_t>(swapChainImages.size());
+  }
 
 private:
   void createInstance();
+  void setupDebugMessenger();
   void pickPhysicalDevice();
   void createLogicalDevice();
-  void findQueueFamilies(const vk::raii::SurfaceKHR surface);
+  void findQueueFamilies();
   void createSurface();
   void createSwapChain();
   void createImageViews();
 
   uint32_t chooseSwapMinImageCount(
       vk::SurfaceCapabilitiesKHR const &surfaceCapabilities);
+
   Window *window;
-  // GraphicsPipeline *graphicsPipeline;
 
   vk::raii::Context context;
   vk::raii::Instance instance = nullptr;
+  vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
   vk::raii::PhysicalDevice physicalDevice = nullptr;
   vk::raii::Device logicalDevice = nullptr;
   vk::raii::Queue graphicsQueue = nullptr;
-  uint32_t graphicsQueueFamilyIndex = 0;
+  uint32_t graphicsQueueFamilyIndex = ~0u;
   vk::raii::SurfaceKHR surface = nullptr;
-  vk::raii::Queue presentQueue = nullptr;
   std::vector<vk::Image> swapChainImages;
   vk::SurfaceFormatKHR swapChainSurfaceFormat;
   vk::Extent2D swapChainExtent;
@@ -66,6 +71,13 @@ private:
   vk::raii::SwapchainKHR swapChain = nullptr;
 
   std::vector<const char *> getRequiredInstanceExtensions();
+
+#ifdef NDEBUG
+  static constexpr bool enableValidationLayers = false;
+#else
+  static constexpr bool enableValidationLayers = true;
+#endif
+
   const std::vector<char const *> validationLayers = {
       "VK_LAYER_KHRONOS_validation"};
 
@@ -79,5 +91,8 @@ private:
       const std::vector<vk::PresentModeKHR> &availablePresentModes);
   vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities);
 
-  // Helper Functions
+  static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
+      vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+      vk::DebugUtilsMessageTypeFlagsEXT type,
+      const vk::DebugUtilsMessengerCallbackDataEXT *pCallbackData, void *);
 };
