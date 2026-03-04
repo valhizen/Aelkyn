@@ -1,11 +1,14 @@
 #include "frames.hpp"
+#include "buffer.hpp"
 #include "commands.hpp"
 #include "context.hpp"
 
-void Frames::init(Context &device, Commands &commands, Window &window) {
+void Frames::init(Context &device, Commands &commands, Window &window,
+                  Buffer &buffer) {
   this->device = &device;
   this->commands = &commands;
   this->window = &window;
+  this->buffer = &buffer;
   createSyncObjects();
 }
 
@@ -51,6 +54,8 @@ void Frames::drawFrame() {
 
   vk::PipelineStageFlags waitDestinationStageMask(
       vk::PipelineStageFlagBits::eColorAttachmentOutput);
+
+  buffer->updateUniformBuffer(currentFrame);
 
   const vk::SubmitInfo submitInfo{
       .waitSemaphoreCount = 1,

@@ -1,11 +1,10 @@
 #pragma once
 
+#include "buffer.hpp"
 #include "commands.hpp"
 #include "context.hpp"
 #include <vector>
 #include <vulkan/vulkan_raii.hpp>
-
-constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 class Frames {
 
@@ -18,10 +17,12 @@ private:
   Context *device;
   Commands *commands;
   Window *window;
+  Buffer *buffer;
 
   void createSyncObjects();
 
 public:
-  void init(Context &device, Commands &commands, Window &window);
+  void init(Context &device, Commands &commands, Window &window,
+            Buffer &buffer);
   void drawFrame();
 };

@@ -1,5 +1,6 @@
 #include "commands.hpp"
 #include "pipeline.hpp"
+#include <array>
 #include <cstdint>
 
 void Commands::init(Context &device, GraphicsPipeline &graphicsPipeline,
@@ -61,13 +62,25 @@ void Commands::recordCommandBuffer(uint32_t imageIndex, uint32_t frameIndex) {
   commandBuffer[frameIndex].bindPipeline(
       vk::PipelineBindPoint::eGraphics,
       *graphicsPipeline->getGraphicsPipeline());
-  commandBuffer[frameIndex].setViewport(
-      0, vk::Viewport(0.0f, 0.0f,
-                      static_cast<float>(device->getSwapChainExtent().width),
-                      static_cast<float>(device->getSwapChainExtent().height),
-                      0.0f, 1.0f));
-  commandBuffer[frameIndex].setScissor(
-      0, vk::Rect2D(vk::Offset2D(0, 0), device->getSwapChainExtent()));
+    std::array<vk::DescriptorSet, 1> descriptorSets = {
+      *graphicsPipeline->getDescriptorSets()[frameIndex]};
+    commandBuffer[frameIndex].bindDescriptorSets(
+      vk::PipelineBindPoint::eGraphics, *graphicsPipeline->getPipelineLayout(),
+      0, descriptorSets, {});
+      vk::Viewport viewport{};
+      viewport.x = 0.0f;
+      viewport.y = 0.0f;
+      viewport.width = static_cast<float>(device->getSwapChainExtent().width);
+      viewport.height = static_cast<float>(device->getSwapChainExtent().height);
+      viewport.minDepth = 0.0f;
+      viewport.maxDepth = 1.0f;
+    commandBuffer[frameIndex].setViewport(0, viewport);
+
+      vk::Rect2D scissor{};
+      scissor.offset.x = 0;
+      scissor.offset.y = 0;
+      scissor.extent = device->getSwapChainExtent();
+    commandBuffer[frameIndex].setScissor(0, scissor);
 
   // FIX: Bind the vertex buffer before drawing
   commandBuffer[frameIndex].bindVertexBuffers(0, *buffer->getVertexBuffer(),

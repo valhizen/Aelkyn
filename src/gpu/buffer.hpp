@@ -1,7 +1,9 @@
 #pragma once
 
+#include "../core/constants.hpp"
 #include "context.hpp"
 #include <array>
+#include <vector>
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -23,6 +25,12 @@ struct Vertex {
   }
 };
 
+struct UniformBufferObject {
+  glm::mat4 model;
+  glm::mat4 view;
+  glm::mat4 proj;
+};
+
 class Buffer {
 private:
   vk::raii::Buffer vertexBuffer = nullptr;
@@ -36,16 +44,25 @@ private:
                           vk::MemoryPropertyFlags properties);
   void createVertexBuffer();
   void createIndexBuffer();
+  void createUniformBuffers();
 
   void createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage,
                     vk::MemoryPropertyFlags properties,
                     vk::raii::Buffer &buffer,
                     vk::raii::DeviceMemory &bufferMemory);
 
+  std::vector<vk::raii::Buffer> uniformBuffers;
+  std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
+  std::vector<void *> uniformBuffersMapped;
+
 public:
   void init(Context &device);
+  void updateUniformBuffer(uint32_t currentImage);
   const vk::raii::Buffer &getVertexBuffer() const { return vertexBuffer; }
   const vk::raii::Buffer &getIndexBuffer() const { return indexBuffer; }
+  const std::vector<vk::raii::Buffer> &getUniformBuffer() {
+    return uniformBuffers;
+  }
 
   const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 };

@@ -23,8 +23,3 @@ struct VSOutput {
   output.color = input.inColor;
   return output;
 }
-
-    [shader("fragment")] float4 fragMain(VSOutput vertIn)
-    : SV_TARGET {
-  return float4(vertIn.color, 1.0);
-}

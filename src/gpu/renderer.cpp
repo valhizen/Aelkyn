@@ -4,10 +4,10 @@
 
 void Renderer::init(Window &window) {
   context.init(window);
-  graphicsPipeline.init(context);
   buffer.init(context);
+  graphicsPipeline.init(context, buffer);
   commands.init(context, graphicsPipeline, buffer);
-  frames.init(context, commands, window);
+  frames.init(context, commands, window, buffer);
 }
 
 void Renderer::drawFrame() { frames.drawFrame(); }
