@@ -27,13 +27,25 @@ class Buffer {
 private:
   vk::raii::Buffer vertexBuffer = nullptr;
   vk::raii::DeviceMemory vertexBufferMemory = nullptr;
+  vk::raii::Buffer indexBuffer = nullptr;
+  vk::raii::DeviceMemory indexBufferMemory = nullptr;
+
   Context *device;
 
   uint32_t findMemoryType(uint32_t typeFilter,
                           vk::MemoryPropertyFlags properties);
   void createVertexBuffer();
+  void createIndexBuffer();
+
+  void createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage,
+                    vk::MemoryPropertyFlags properties,
+                    vk::raii::Buffer &buffer,
+                    vk::raii::DeviceMemory &bufferMemory);
 
 public:
   void init(Context &device);
   const vk::raii::Buffer &getVertexBuffer() const { return vertexBuffer; }
+  const vk::raii::Buffer &getIndexBuffer() const { return indexBuffer; }
+
+  const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 };

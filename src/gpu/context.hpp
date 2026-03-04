@@ -41,11 +41,15 @@ public:
     return static_cast<uint32_t>(swapChainImages.size());
   }
 
+  void copyBuffer(vk::raii::Buffer &srcBuffer, vk::raii::Buffer &dstBuffer,
+                  vk::DeviceSize size);
+
 private:
   void createInstance();
   void setupDebugMessenger();
   void pickPhysicalDevice();
   void createLogicalDevice();
+  void createTransferCommandPool();
   void findQueueFamilies();
   void createSurface();
   void createSwapChain();
@@ -62,6 +66,7 @@ private:
   vk::raii::PhysicalDevice physicalDevice = nullptr;
   vk::raii::Device logicalDevice = nullptr;
   vk::raii::Queue graphicsQueue = nullptr;
+  vk::raii::CommandPool transferCommandPool = nullptr;
   uint32_t graphicsQueueFamilyIndex = ~0u;
   vk::raii::SurfaceKHR surface = nullptr;
   std::vector<vk::Image> swapChainImages;

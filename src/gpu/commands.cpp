@@ -72,8 +72,9 @@ void Commands::recordCommandBuffer(uint32_t imageIndex, uint32_t frameIndex) {
   // FIX: Bind the vertex buffer before drawing
   commandBuffer[frameIndex].bindVertexBuffers(0, *buffer->getVertexBuffer(),
                                               {0});
-
-  commandBuffer[frameIndex].draw(3, 1, 0, 0);
+  commandBuffer[frameIndex].bindIndexBuffer(*buffer->getIndexBuffer(), 0,
+                                            vk::IndexType::eUint16);
+  commandBuffer[frameIndex].drawIndexed(buffer->indices.size(), 1, 0, 0, 0);
   commandBuffer[frameIndex].endRendering();
 
   transition_image_layout(imageIndex, frameIndex,

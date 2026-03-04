@@ -1,12 +1,12 @@
 #include "context.hpp"
 #include <algorithm>
 #include <cstdint>
-#include <cstring>
 #include <iostream>
 #include <limits>
 #include <map>
 #include <stdexcept>
 #include <vector>
+#include <vulkan/vulkan_raii.hpp>
 
 void Context::init(Window &window) {
   this->window = &window;
@@ -17,6 +17,7 @@ void Context::init(Window &window) {
   pickPhysicalDevice();
   findQueueFamilies();
   createLogicalDevice();
+  createTransferCommandPool();
   createSwapChain();
   createImageViews();
 }
@@ -217,6 +218,13 @@ void Context::createLogicalDevice() {
   graphicsQueue = vk::raii::Queue(logicalDevice, graphicsQueueFamilyIndex, 0);
 }
 
+void Context::createTransferCommandPool() {
+  vk::CommandPoolCreateInfo poolInfo{
+      .flags = vk::CommandPoolCreateFlagBits::eTransient,
+      .queueFamilyIndex = graphicsQueueFamilyIndex};
+  transferCommandPool = vk::raii::CommandPool(logicalDevice, poolInfo);
+}
+
 void Context::createSurface() {
   VkSurfaceKHR _surface;
   if (glfwCreateWindowSurface(*instance, window->getWindow(), nullptr,
@@ -322,6 +330,25 @@ void Context::recreateSwapChain() {
   cleanupSwapChain();
   createSwapChain();
   createImageViews();
+}
+
+void Context::copyBuffer(vk::raii::Buffer &srcBuffer,
+                         vk::raii::Buffer &dstBuffer, vk::DeviceSize size) {
+  vk::CommandBufferAllocateInfo allocInfo{
+    .commandPool = transferCommandPool,
+    .level = vk::CommandBufferLevel::ePrimary,
+    .commandBufferCount = 1};
+  vk::raii::CommandBuffer commandCopyBuffer =
+      std::move(logicalDevice.allocateCommandBuffers(allocInfo).front());
+  commandCopyBuffer.begin(vk::CommandBufferBeginInfo{
+      .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+  commandCopyBuffer.copyBuffer(*srcBuffer, *dstBuffer,
+                               vk::BufferCopy(0, 0, size));
+  commandCopyBuffer.end();
+  graphicsQueue.submit(vk::SubmitInfo{.commandBufferCount = 1,
+                                      .pCommandBuffers = &*commandCopyBuffer},
+                       nullptr);
+  logicalDevice.waitIdle();
 }
 
 void Context::cleanupSwapChain() {
