@@ -329,3 +329,43 @@ void Device::endSingleTimeCommands(vk::raii::CommandBuffer &cmd) {
       nullptr);
   logicalDevice.waitIdle();
 }
+
+vk::Format
+Device::findSupportedFormat(const std::vector<vk::Format> &candidates,
+                            vk::ImageTiling tiling,
+                            vk::FormatFeatureFlags features) {
+
+  for (const auto format : candidates) {
+    vk::FormatProperties props = physicalDevice.getFormatProperties(format);
+
+    if (tiling == vk::ImageTiling::eLinear &&
+        (props.linearTilingFeatures & features) == features) {
+      return format;
+    }
+    if (tiling == vk::ImageTiling::eOptimal &&
+        (props.optimalTilingFeatures & features) == features) {
+      return format;
+    }
+  }
+
+  throw std::runtime_error("failed to find supported format!");
+}
+
+vk::Format Device::findDepthFormat() {
+  return findSupportedFormat(
+      {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint,
+       vk::Format::eD24UnormS8Uint},
+      vk::ImageTiling::eOptimal,
+      vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+}
+
+vk::raii::ImageView Device::createImageView(vk::raii::Image &image,
+                                            vk::Format format,
+                                            vk::ImageAspectFlags aspectFlags) {
+  vk::ImageViewCreateInfo viewInfo{
+      .image = image,
+      .viewType = vk::ImageViewType::e2D,
+      .format = format,
+      .subresourceRange = {aspectFlags, 0, 1, 0, 1}};
+  return vk::raii::ImageView(logicalDevice, viewInfo);
+}

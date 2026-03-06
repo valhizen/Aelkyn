@@ -23,13 +23,11 @@ private:
   void createSyncObjects();
 
   void recordCommandBuffer(uint32_t imageIndex, uint32_t frameIndex);
-  void transitionImageLayout(uint32_t imageIndex, uint32_t frameIndex,
-                             vk::ImageLayout oldLayout,
-                             vk::ImageLayout newLayout,
-                             vk::AccessFlags2 srcAccessMask,
-                             vk::AccessFlags2 dstAccessMask,
-                             vk::PipelineStageFlags2 srcStageMask,
-                             vk::PipelineStageFlags2 dstStageMask);
+  void transitionImageLayout(
+      vk::Image image, uint32_t frameIndex, vk::ImageLayout oldLayout,
+      vk::ImageLayout newLayout, vk::AccessFlags2 srcAccessMask,
+      vk::AccessFlags2 dstAccessMask, vk::PipelineStageFlags2 srcStageMask,
+      vk::PipelineStageFlags2 dstStageMask, vk::ImageAspectFlags aspectFlags);
 
   Device *device = nullptr;
   SwapChain *swapChain = nullptr;

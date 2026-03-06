@@ -3,10 +3,7 @@
 
 void GraphicsPipeline::init(Device &device,
                             const vk::SurfaceFormatKHR &surfaceFormat,
-                            vk::Format depthFormat, Buffer &buffer,
-                            Texture &texture) {
-  this->depthFormat_ = depthFormat;
-
+                            Buffer &buffer, Texture &texture) {
   this->device = &device;
   this->buffer = &buffer;
   this->texture = &texture;
@@ -31,13 +28,12 @@ void GraphicsPipeline::createPipeline() {
       .pName = "fragMain"};
   vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo,
                                                       fragShaderStageInfo};
-  vk::PipelineDepthStencilStateCreateInfo depthStencil{
-      .depthTestEnable = vk::True,
-      .depthWriteEnable = vk::True,
-      .depthCompareOp = vk::CompareOp::eLess,
-      .depthBoundsTestEnable = vk::False,
-      .stencilTestEnable = vk::False};
-
+vk::PipelineDepthStencilStateCreateInfo depthStencil{
+    .depthTestEnable       = vk::True,
+    .depthWriteEnable      = vk::True,
+    .depthCompareOp        = vk::CompareOp::eLess,
+    .depthBoundsTestEnable = vk::False,
+    .stencilTestEnable     = vk::False};
   auto bindingDescription = Vertex::getBindingDescription();
   auto attributeDescriptions = Vertex::getAttributeDescriptions();
   vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
@@ -102,14 +98,12 @@ void GraphicsPipeline::createPipeline() {
            .pViewportState = &viewportState,
            .pRasterizationState = &rasterizer,
            .pMultisampleState = &multisampling,
-           .pDepthStencilState = &depthStencil,
            .pColorBlendState = &colorBlending,
            .pDynamicState = &dynamicState,
            .layout = pipelineLayout,
            .renderPass = nullptr},
           {.colorAttachmentCount = 1,
-           .pColorAttachmentFormats = &surfaceFormat.format,
-           .depthAttachmentFormat = depthFormat_}};
+           .pColorAttachmentFormats = &surfaceFormat.format}};
 
   pipeline_ = vk::raii::Pipeline(
       device->logical(), nullptr,

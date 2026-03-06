@@ -19,11 +19,15 @@ public:
     return imageViews_;
   }
   uint32_t imageCount() const { return static_cast<uint32_t>(images_.size()); }
+  const vk::raii::ImageView &depthImageView() const { return depthImageView_; }
+  vk::Image depthImage() const { return *depthImage_; }
+  vk::Format depthFormat() const { return depthFormat_; }
 
 private:
   void create();
   void createImageViews();
   void cleanup();
+  void createDepthResources();
 
   vk::SurfaceFormatKHR
   chooseFormat(const std::vector<vk::SurfaceFormatKHR> &formats);
@@ -40,4 +44,8 @@ private:
   std::vector<vk::raii::ImageView> imageViews_;
   vk::SurfaceFormatKHR format;
   vk::Extent2D swapExtent;
+  vk::raii::Image depthImage_ = nullptr;
+  vk::raii::DeviceMemory depthImageMemory_ = nullptr;
+  vk::raii::ImageView depthImageView_ = nullptr;
+  vk::Format depthFormat_;
 };

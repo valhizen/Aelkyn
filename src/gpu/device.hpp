@@ -40,7 +40,17 @@ public:
                          uint32_t width, uint32_t height);
 
   [[nodiscard]] vk::raii::CommandBuffer beginSingleTimeCommands();
+
   void endSingleTimeCommands(vk::raii::CommandBuffer &cmd);
+
+  bool hasStencilComponent(vk::Format format) {
+    return format == vk::Format::eD32SfloatS8Uint ||
+           format == vk::Format::eD24UnormS8Uint;
+  }
+
+  vk::Format findDepthFormat();
+  vk::raii::ImageView createImageView(vk::raii::Image &image, vk::Format format,
+                                      vk::ImageAspectFlags aspectFlags);
 
 private:
   void createInstance();
@@ -50,6 +60,9 @@ private:
   void findQueueFamilies();
   void createLogicalDevice();
   void createUtilityCommandPool();
+  vk::Format findSupportedFormat(const std::vector<vk::Format> &candidates,
+                                 vk::ImageTiling tiling,
+                                 vk::FormatFeatureFlags features);
 
   vk::raii::Context context;
   vk::raii::Instance instance = nullptr;

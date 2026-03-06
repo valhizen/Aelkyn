@@ -6,7 +6,8 @@ void Aelkyn::init() {
   swapChain.init(device, window);
   buffer.init(device);
   texture.init(device, "../textures/texture.jpg");
-  pipeline.init(device, swapChain.surfaceFormat(), buffer, texture);
+  pipeline.init(device, swapChain.surfaceFormat(), swapChain.depthFormat(),
+                buffer, texture);
   renderer.init(device, swapChain, pipeline, buffer, window);
 }
 

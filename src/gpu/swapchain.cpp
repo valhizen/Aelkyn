@@ -1,4 +1,5 @@
 #include "swapchain.hpp"
+#include "device.hpp"
 #include <algorithm>
 #include <cassert>
 #include <limits>
@@ -8,6 +9,7 @@ void SwapChain::init(Device &device, Window &window) {
   this->window = &window;
   create();
   createImageViews();
+  createDepthResources();
 }
 
 void SwapChain::recreate() {
@@ -23,9 +25,14 @@ void SwapChain::recreate() {
   cleanup();
   create();
   createImageViews();
+  createDepthResources();
 }
 
 void SwapChain::cleanup() {
+
+  depthImageView_ = nullptr;
+  depthImage_ = nullptr;
+  depthImageMemory_ = nullptr;
   imageViews_.clear();
   swapChain = nullptr;
 }
@@ -117,4 +124,15 @@ uint32_t SwapChain::chooseMinImageCount(
     minImageCount = surfaceCapabilities.maxImageCount;
   }
   return minImageCount;
+}
+void SwapChain::createDepthResources() {
+  depthFormat_ = device->findDepthFormat();
+
+  device->createImage(swapExtent.width, swapExtent.height, depthFormat_,
+                      vk::ImageTiling::eOptimal,
+                      vk::ImageUsageFlagBits::eDepthStencilAttachment,
+                      vk::MemoryPropertyFlagBits::eDeviceLocal, depthImage_,
+                      depthImageMemory_);
+  depthImageView_ = device->createImageView(depthImage_, depthFormat_,
+                                            vk::ImageAspectFlagBits::eDepth);
 }

@@ -17,7 +17,9 @@ void Renderer::init(Device &device, SwapChain &swapChain,
   createSyncObjects();
 }
 
+// ---------------------------------------------------------------------------
 // Setup
+// ---------------------------------------------------------------------------
 
 void Renderer::createCommandPool() {
   vk::CommandPoolCreateInfo poolInfo{
@@ -39,13 +41,11 @@ void Renderer::createCommandBuffers() {
 }
 
 void Renderer::createSyncObjects() {
-  // renderFinished is indexed by imageIndex (one per swap chain image)
   for (size_t i = 0; i < swapChain->imageCount(); i++) {
     renderFinishedSemaphores.emplace_back(device->logical(),
                                           vk::SemaphoreCreateInfo());
   }
 
-  // presentComplete and inFlight are indexed by frameIndex
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     presentCompleteSemaphores.emplace_back(device->logical(),
                                            vk::SemaphoreCreateInfo());
@@ -55,7 +55,9 @@ void Renderer::createSyncObjects() {
   }
 }
 
+// ---------------------------------------------------------------------------
 // Frame loop
+// ---------------------------------------------------------------------------
 
 void Renderer::drawFrame() {
   auto fenceResult = device->logical().waitForFences(
@@ -114,31 +116,58 @@ void Renderer::drawFrame() {
   currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
+// ---------------------------------------------------------------------------
 // Command recording
+// ---------------------------------------------------------------------------
 
 void Renderer::recordCommandBuffer(uint32_t imageIndex, uint32_t frameIndex) {
   commandBuffers[frameIndex].reset();
   commandBuffers[frameIndex].begin({});
 
-  // Transition: undefined → color attachment
-  transitionImageLayout(imageIndex, frameIndex, vk::ImageLayout::eUndefined,
+  // Transition: color image undefined → color attachment optimal
+  transitionImageLayout(swapChain->images()[imageIndex], frameIndex,
+                        vk::ImageLayout::eUndefined,
                         vk::ImageLayout::eColorAttachmentOptimal, {},
                         vk::AccessFlagBits2::eColorAttachmentWrite,
                         vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-                        vk::PipelineStageFlagBits2::eColorAttachmentOutput);
+                        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                        vk::ImageAspectFlagBits::eColor);
+
+  // Transition: depth image undefined → depth attachment optimal
+  transitionImageLayout(swapChain->depthImage(), frameIndex,
+                        vk::ImageLayout::eUndefined,
+                        vk::ImageLayout::eDepthAttachmentOptimal,
+                        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+                        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+                        vk::PipelineStageFlagBits2::eEarlyFragmentTests |
+                            vk::PipelineStageFlagBits2::eLateFragmentTests,
+                        vk::PipelineStageFlagBits2::eEarlyFragmentTests |
+                            vk::PipelineStageFlagBits2::eLateFragmentTests,
+                        vk::ImageAspectFlagBits::eDepth);
 
   vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
+  vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
+
   vk::RenderingAttachmentInfo attachmentInfo = {
       .imageView = swapChain->imageViews()[imageIndex],
       .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
       .loadOp = vk::AttachmentLoadOp::eClear,
       .storeOp = vk::AttachmentStoreOp::eStore,
       .clearValue = clearColor};
+
+  vk::RenderingAttachmentInfo depthAttachmentInfo = {
+      .imageView = swapChain->depthImageView(),
+      .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+      .loadOp = vk::AttachmentLoadOp::eClear,
+      .storeOp = vk::AttachmentStoreOp::eDontCare,
+      .clearValue = clearDepth};
+
   vk::RenderingInfo renderingInfo = {
       .renderArea = {.offset = {0, 0}, .extent = swapChain->extent()},
       .layerCount = 1,
       .colorAttachmentCount = 1,
-      .pColorAttachments = &attachmentInfo};
+      .pColorAttachments = &attachmentInfo,
+      .pDepthAttachment = &depthAttachmentInfo};
 
   commandBuffers[frameIndex].beginRendering(renderingInfo);
 
@@ -172,23 +201,26 @@ void Renderer::recordCommandBuffer(uint32_t imageIndex, uint32_t frameIndex) {
   commandBuffers[frameIndex].endRendering();
 
   // Transition: color attachment → present
-  transitionImageLayout(imageIndex, frameIndex,
+  transitionImageLayout(swapChain->images()[imageIndex], frameIndex,
                         vk::ImageLayout::eColorAttachmentOptimal,
                         vk::ImageLayout::ePresentSrcKHR,
                         vk::AccessFlagBits2::eColorAttachmentWrite, {},
                         vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-                        vk::PipelineStageFlagBits2::eBottomOfPipe);
+                        vk::PipelineStageFlagBits2::eBottomOfPipe,
+                        vk::ImageAspectFlagBits::eColor);
 
   commandBuffers[frameIndex].end();
 }
 
-void Renderer::transitionImageLayout(uint32_t imageIndex, uint32_t frameIndex,
-                                     vk::ImageLayout oldLayout,
-                                     vk::ImageLayout newLayout,
-                                     vk::AccessFlags2 srcAccessMask,
-                                     vk::AccessFlags2 dstAccessMask,
-                                     vk::PipelineStageFlags2 srcStageMask,
-                                     vk::PipelineStageFlags2 dstStageMask) {
+// ---------------------------------------------------------------------------
+// Image layout transitions
+// ---------------------------------------------------------------------------
+
+void Renderer::transitionImageLayout(
+    vk::Image image, uint32_t frameIndex, vk::ImageLayout oldLayout,
+    vk::ImageLayout newLayout, vk::AccessFlags2 srcAccessMask,
+    vk::AccessFlags2 dstAccessMask, vk::PipelineStageFlags2 srcStageMask,
+    vk::PipelineStageFlags2 dstStageMask, vk::ImageAspectFlags aspectFlags) {
   vk::ImageMemoryBarrier2 barrier = {
       .srcStageMask = srcStageMask,
       .srcAccessMask = srcAccessMask,
@@ -198,8 +230,8 @@ void Renderer::transitionImageLayout(uint32_t imageIndex, uint32_t frameIndex,
       .newLayout = newLayout,
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .image = swapChain->images()[imageIndex],
-      .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor,
+      .image = image,
+      .subresourceRange = {.aspectMask = aspectFlags,
                            .baseMipLevel = 0,
                            .levelCount = 1,
                            .baseArrayLayer = 0,

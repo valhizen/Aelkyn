@@ -13,7 +13,7 @@
 class GraphicsPipeline {
 public:
   void init(Device &device, const vk::SurfaceFormatKHR &surfaceFormat,
-            Buffer &buffer, Texture &texture);
+            vk::Format depthFormat, Buffer &buffer, Texture &texture);
 
   const vk::raii::Pipeline &getPipeline() const { return pipeline_; }
   const vk::raii::PipelineLayout &getLayout() const { return pipelineLayout; }
@@ -34,6 +34,7 @@ private:
   Buffer *buffer = nullptr;
   Texture *texture = nullptr;
   vk::SurfaceFormatKHR surfaceFormat;
+  vk::Format depthFormat_;
 
   vk::raii::DescriptorSetLayout descriptorSetLayout = nullptr;
   vk::raii::PipelineLayout pipelineLayout = nullptr;
