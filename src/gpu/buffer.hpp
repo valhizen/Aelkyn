@@ -7,7 +7,8 @@
 
 class Buffer {
 public:
-  void init(Device &device);
+  void init(Device &device, const std::vector<Vertex> &vertices,
+            const std::vector<uint32_t> &indices);
 
   void updateUniformBuffer(uint32_t currentImage, const vk::Extent2D &extent);
 
@@ -17,8 +18,7 @@ public:
     return uniformBuffers;
   }
 
-  // const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
-  const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
+  uint32_t indexCount() const { return indexCount_; }
 
 private:
   void createVertexBuffer();
@@ -26,6 +26,11 @@ private:
   void createUniformBuffers();
 
   Device *device = nullptr;
+
+  // CPU-side copies kept for staging upload
+  std::vector<Vertex> vertices_;
+  std::vector<uint32_t> indices_;
+  uint32_t indexCount_ = 0;
 
   vk::raii::Buffer vertexBuffer = nullptr;
   vk::raii::DeviceMemory vertexBufferMemory = nullptr;

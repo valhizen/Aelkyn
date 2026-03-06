@@ -4,39 +4,19 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-// const std::vector<Vertex> vertices = {
-//     {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-//     {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-//     {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-//     {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}};
-
-// const std::vector<Vertex> vertices = {
-
-//     {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-//     {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-//     {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-//     {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
-
-const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
-
-void Buffer::init(Device &device) {
+void Buffer::init(Device &device, const std::vector<Vertex> &vertices,
+                  const std::vector<uint32_t> &indices) {
   this->device = &device;
+  this->vertices_ = vertices;
+  this->indices_ = indices;
+  this->indexCount_ = static_cast<uint32_t>(indices.size());
   createVertexBuffer();
   createIndexBuffer();
   createUniformBuffers();
 }
 
 void Buffer::createVertexBuffer() {
-  vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+  vk::DeviceSize bufferSize = sizeof(vertices_[0]) * vertices_.size();
 
   vk::raii::Buffer stagingBuffer({});
   vk::raii::DeviceMemory stagingMemory({});
@@ -46,7 +26,7 @@ void Buffer::createVertexBuffer() {
                        stagingBuffer, stagingMemory);
 
   void *data = stagingMemory.mapMemory(0, bufferSize);
-  memcpy(data, vertices.data(), bufferSize);
+  memcpy(data, vertices_.data(), bufferSize);
   stagingMemory.unmapMemory();
 
   device->createBuffer(bufferSize,
@@ -56,10 +36,14 @@ void Buffer::createVertexBuffer() {
                        vertexBufferMemory);
 
   device->copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+  // Free CPU copy after upload
+  vertices_.clear();
+  vertices_.shrink_to_fit();
 }
 
 void Buffer::createIndexBuffer() {
-  vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+  vk::DeviceSize bufferSize = sizeof(indices_[0]) * indices_.size();
 
   vk::raii::Buffer stagingBuffer({});
   vk::raii::DeviceMemory stagingMemory({});
@@ -69,7 +53,7 @@ void Buffer::createIndexBuffer() {
                        stagingBuffer, stagingMemory);
 
   void *data = stagingMemory.mapMemory(0, bufferSize);
-  memcpy(data, indices.data(), static_cast<size_t>(bufferSize));
+  memcpy(data, indices_.data(), static_cast<size_t>(bufferSize));
   stagingMemory.unmapMemory();
 
   device->createBuffer(bufferSize,
@@ -79,6 +63,10 @@ void Buffer::createIndexBuffer() {
                        indexBufferMemory);
 
   device->copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+  // Free CPU copy after upload
+  indices_.clear();
+  indices_.shrink_to_fit();
 }
 
 void Buffer::createUniformBuffers() {
@@ -111,8 +99,9 @@ void Buffer::updateUniformBuffer(uint32_t currentImage,
                    .count();
 
   UniformBufferObject ubo{};
-  ubo.model = rotate(glm::mat4(1.0f), time * glm::radians(90.0f),
-                     glm::vec3(0.0f, 0.0f, 1.0f));
+  // ubo.model = rotate(glm::mat4(1.0f), time * glm::radians(90.0f),
+  //                    glm::vec3(0.0f, 0.0f, 1.0f));
+  ubo.model = glm::mat4(1.0f);
   ubo.view = lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f),
                     glm::vec3(0.0f, 0.0f, 1.0f));
   ubo.proj = glm::perspective(glm::radians(45.0f),

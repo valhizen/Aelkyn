@@ -18,6 +18,7 @@ add_executable(app
   src/gpu/texture.cpp
   src/gpu/pipeline.cpp
   src/gpu/renderer.cpp
+  src/assets/model.cpp
 )
 
 target_include_directories(app

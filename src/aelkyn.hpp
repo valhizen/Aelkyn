@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "assets/model.hpp"
 #include "gpu/buffer.hpp"
 #include "gpu/device.hpp"
 #include "gpu/pipeline.hpp"
@@ -15,6 +16,7 @@ public:
   void run();
 
 private:
+  Model model;
   Window window;
   Device device;
   SwapChain swapChain;

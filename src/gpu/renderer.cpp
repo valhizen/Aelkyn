@@ -195,8 +195,8 @@ void Renderer::recordCommandBuffer(uint32_t imageIndex, uint32_t frameIndex) {
   commandBuffers[frameIndex].bindVertexBuffers(0, *buffer->getVertexBuffer(),
                                                {0});
   commandBuffers[frameIndex].bindIndexBuffer(*buffer->getIndexBuffer(), 0,
-                                             vk::IndexType::eUint16);
-  commandBuffers[frameIndex].drawIndexed(buffer->indices.size(), 1, 0, 0, 0);
+                                             vk::IndexType::eUint32);
+  commandBuffers[frameIndex].drawIndexed(buffer->indexCount(), 1, 0, 0, 0);
 
   commandBuffers[frameIndex].endRendering();
 
