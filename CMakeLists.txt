@@ -11,13 +11,13 @@ find_package(glfw3 REQUIRED)
 add_executable(app
   src/main.cpp
   src/aelkyn.cpp
-  src/gpu/context.cpp
   src/window.cpp
-  src/gpu/renderer.cpp
-  src/gpu/pipeline.cpp
-  src/gpu/commands.cpp
-  src/gpu/frames.cpp
+  src/gpu/device.cpp
+  src/gpu/swapchain.cpp
   src/gpu/buffer.cpp
+  src/gpu/texture.cpp
+  src/gpu/pipeline.cpp
+  src/gpu/renderer.cpp
 )
 
 target_include_directories(app
