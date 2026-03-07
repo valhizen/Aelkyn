@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(WebsiteVulkanApplication LANGUAGES CXX)
-
+project(Aelkyn LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -8,46 +7,26 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 
+# ImGui sources
+set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/external/imgui)
+add_library(imgui STATIC
+  ${IMGUI_DIR}/imgui.cpp
+  ${IMGUI_DIR}/imgui_demo.cpp
+  ${IMGUI_DIR}/imgui_draw.cpp
+  ${IMGUI_DIR}/imgui_tables.cpp
+  ${IMGUI_DIR}/imgui_widgets.cpp
+  ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+  ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+)
+target_include_directories(imgui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+target_link_libraries(imgui PUBLIC Vulkan::Vulkan glfw)
+
 add_executable(app
-  src/main.cpp
-  src/aelkyn.cpp
-  src/window.cpp
-  src/gpu/device.cpp
-  src/gpu/swapchain.cpp
-  src/gpu/buffer.cpp
-  src/gpu/texture.cpp
-  src/gpu/pipeline.cpp
-  src/gpu/renderer.cpp
-  src/assets/model.cpp
+  source/main.cpp
+  source/core/Window.cpp
+  source/Application.cpp
+  source/game/Input.cpp
+  source/gpu/Device.cpp
 )
-
-target_include_directories(app
-  PRIVATE
-  ${CMAKE_SOURCE_DIR}/include
-)
-
-target_link_libraries(app PRIVATE Vulkan::Vulkan glfw)
-
-
-find_program(SLANGC slangc HINTS $ENV{VULKAN_SDK}/bin)
-
-if(SLANGC)
-    set(SHADER_DIR ${CMAKE_SOURCE_DIR}/shaders)
-    set(SPV_DIR ${CMAKE_BINARY_DIR}/shaders)
-    file(MAKE_DIRECTORY ${SPV_DIR})
-
-    add_custom_command(OUTPUT ${SPV_DIR}/shader.spv
-        COMMAND ${SLANGC} ${SHADER_DIR}/shader.slang
-            -target spirv
-            -o ${SPV_DIR}/shader.spv
-            -entry vertMain -stage vertex
-            -entry fragMain -stage fragment
-        DEPENDS ${SHADER_DIR}/shader.slang
-        COMMENT "Compiling shader.slang -> shader.spv"
-    )
-
-    add_custom_target(shaders ALL DEPENDS ${SPV_DIR}/shader.spv)
-    add_dependencies(app shaders)
-else()
-    message(WARNING "slangc not found — install Slang (https://github.com/shader-slang/slang) or add it to PATH")
-endif()
+target_include_directories(app PRIVATE source)
+target_link_libraries(app PRIVATE imgui Vulkan::Vulkan glfw)
