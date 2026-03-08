@@ -22,11 +22,17 @@ target_include_directories(imgui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
 target_link_libraries(imgui PUBLIC Vulkan::Vulkan glfw)
 
 add_executable(app
-  source/main.cpp
-  source/core/Window.cpp
-  source/Application.cpp
-  source/game/Input.cpp
-  source/gpu/Device.cpp
+  src/main.cpp
+  src/application.cpp
+
+  src/core/window.cpp
+  src/core/vulkan.cpp
+
+  src/renderer/device.cpp
+
+  src/components/input.cpp
+  src/components/camera.cpp
+
 )
 target_include_directories(app PRIVATE source)
 target_link_libraries(app PRIVATE imgui Vulkan::Vulkan glfw)
